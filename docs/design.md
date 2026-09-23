@@ -180,6 +180,41 @@ have sent, consulting neither that engine's off switch nor its ledger. An import
 have silently bypassed a safety flag. Now it falls back to a quarantine policy: closable,
 never sendable, and it logs loudly.
 
+## Time as a trigger
+
+A webhook-driven service can only react. It cannot notice that a conversation went quiet,
+which is the most common thing that happens to a conversation. `runtime/scheduler.py` is the
+sibling that can: it scans on a timer, decides who is worth nudging, and produces the same
+approval card the reactive engine produces.
+
+**It was justified by a measurement, not an intuition.** Of 1,975 conversations, 1,258 ended
+with our message; 433 of those had a link in the thread and three or more days of silence;
+312 carried a positive-reply marker. Twelve weeks had produced thirty manual nudges, none of
+them automated. The gap between 312 and 30 is what paid for the build, and an afternoon of
+SQL found it before a line of code was written. A scheduled engine is easy to justify by
+feel and easy to get wrong; this is the cheapest possible way to be sure.
+
+**Every skip carries a reason.** In production the engine recorded 126,406 suppressed
+subjects, each with the rule that caused it. That is not logging for its own sake:
+"we skipped silently" and "nothing was eligible" are the same observation from the outside,
+and the difference between them is a whole cohort quietly dropped. A skip ledger is how you
+find out that a suppression rule added last month is eating everyone.
+
+**Rule order is part of the contract**, and in two ways. Cheapest first, because only the
+first matching rule runs. But more importantly **most specific first**: the first version of
+the rule list put "too recent" above "empty thread", and an empty conversation has a
+quiet-time of zero, so every subject with no history was filed under "nudged too recently".
+The behaviour was correct and the explanation was a lie, which is precisely the failure the
+skip ledger exists to catch. `tests/test_scheduler.py` has the regression.
+
+**And the world changes while a card waits.** Everything on a nudge card was decided when it
+was posted, and a card can sit for days. In that window the other party can reply, the
+situation can resolve, someone can land on a do-not-contact list. So there is a click-time
+re-check that asks only the questions whose answer makes sending actively wrong, and it
+**fails closed**: if a check cannot be made, it refuses. An unreachable system must never
+read as "nothing has changed". The cost of refusing is a delay; the next scan reconsiders
+them. The cost of the alternative is a message to someone who already answered.
+
 ## What is portable and what is not
 
 | Ports | Does not port |

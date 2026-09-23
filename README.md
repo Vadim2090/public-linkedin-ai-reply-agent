@@ -1,14 +1,17 @@
-# approval-gated-agent
+# public-linkedin-ai-reply-agent
 
-A small, runnable implementation of a pattern that turns out to be the interesting part of
-most LLM products people actually ship: **a model drafts, a human approves, and the approval
-is kept as training data.**
+The public, domain-free extraction of a LinkedIn reply agent I have been building and
+operating since **June 2025**: an inbound message arrives, a model drafts a reply, a human
+approves it, and **the approval is kept as training data.**
 
-Not an agent framework. About 1,500 lines, five standard-library imports, no dependencies at
-all for the offline path.
+That third clause is the one most review workflows drop, and it is the reason this
+repository exists.
+
+Not an agent framework. About 2,600 lines, standard library only, no dependencies at all for
+the offline path.
 
 ```bash
-git clone <this repo> && cd approval-gated-agent
+git clone <this repo> && cd public-linkedin-ai-reply-agent
 python3 -m example.demo          # no API key needed
 python3 -m unittest discover -s tests -t .
 ```
@@ -19,28 +22,62 @@ model call is a deterministic local function unless you point it at a provider.
 
 ## Where this comes from
 
-This is the domain-free layer of a system that has been in production since July 2026,
-handling inbound replies for a US immigration-services company. That system is private: its
-prompts carry a named individual's professional identity, its logs carry real customers'
-names, and its policy file is the company's commercial playbook. None of that can be made
-public by deleting files, because the git history keeps it.
+| | |
+|---|---|
+| **June 2025** | First version live: a single-pass prompt on a hosted automation platform (Zapier). No version control, prompts pasted into a web form. |
+| **February 2026** | Single pass split into two: classify, then generate. Almost every failure had been a misread of the conversation cascading into a confident wrong reply. |
+| **March 2026** | The work moves into git. Everything before this exists only as prompt text carried forward. |
+| **July 2026** | Rewritten as a self-hosted service. The automation platform is bypassed on 31 July and retired on 7 August. |
+| **August 2026** | A second engine ships: scheduled nudges, with time as a trigger. |
+| **September 2026** | The learning loop closes: corrections become labelled data, and a weekly pass turns recurring ones into prompt edits. |
 
-So this repository is a **fresh extraction, not a redaction**. The transport, the
-orchestration, the approval primitive, the concurrency guards and the learning loop are the
-same design. The domain is an invented support inbox.
+The production system is private and stays private. Its prompts carry a named individual's
+professional identity, its logs carry real customers' names and addresses, and its policy
+file is the company's commercial playbook. None of that can be made public by deleting
+files, because the git history keeps it.
 
-Numbers from the production system, read from its state database on 2026-09-22:
+So this repository is a **fresh extraction, not a redaction.** The transport, the
+orchestration, the approval primitive, the concurrency guards, the scheduled engine and the
+learning loop are the same design. The domain is an invented support inbox, because the real
+one cannot ship.
+
+## Operating numbers
+
+Read from the production state database on 2026-09-22.
+
+**Read the window before the counts.** That database was created on **2026-06-25**, when the
+service was rewritten. The fourteen months before it, on the earlier automation platform, are
+not counted here at all: that era had no state store, only a chat channel and a log file. So
+these figures describe the current service's first three months, not the lifetime of the
+system.
+
+**Reply engine**, 2026-06-25 to 2026-09-21:
 
 | | |
 |---|---|
-| Approval cards issued | 3,268 |
-| Decided reply cards | 2,329 |
+| Approval cards issued | 2,608 |
+| Decided | 2,329 |
 | Approved with no edit | 76.7% |
 | Corrected by a reviewer, then sent | 5.3% |
 | Declined, no reply wanted | 18.0% |
 | Peak week | 565 cards |
+
+**Scheduled nudge engine**, 2026-08-21 to 2026-09-22:
+
+| | |
+|---|---|
+| Nudge cards issued | 659 |
+| Approved and sent | 436 |
+| Suppressed, each with a recorded reason | 126,406 |
+
+**Learning loop**, since 2026-09-02:
+
+| | |
+|---|---|
 | Human corrections captured as labelled examples | 399 |
-| Prompt edits applied through the weekly gate | 6 |
+| Carrying the reviewer's own words | 289 |
+| Candidates reaching the weekly gate | 20 |
+| Prompt edits applied | 6 |
 
 ## The idea worth stealing
 
@@ -70,12 +107,36 @@ Four rules follow, and they are the spine of this repository:
 4. **Deploy the fix without a release**, or the loop stalls at its last step. Prompts are
    read fresh from disk on every call here for exactly that reason.
 
+## Two engines, one gate
+
+The reactive engine answers inbound messages. It cannot notice that a conversation went
+quiet, which is the most common thing that happens to a conversation, so a second engine
+scans on a timer.
+
+They share the store, the approval primitive, the review surface and the approve-then-send
+mechanic. Each keeps its own entry criteria, suppression rules, cadence, send lock and
+approver list. That division is what made a third engine cost **one policy registration
+instead of four new branches** - see `runtime/approval.py`.
+
+The scheduled engine was justified by a measurement rather than an intuition: of 1,975
+conversations, 1,258 ended with our message, 433 of those had a link and three or more days
+of silence, and 312 carried a positive-reply marker, against thirty manual nudges in twelve
+weeks. The gap between 312 and 30 is what paid for the build, and finding it cost an
+afternoon of SQL.
+
+**Every suppressed subject leaves a reason.** 126,406 of them. That is not logging for its
+own sake: "we skipped silently" and "nothing was eligible" are the same observation from
+outside, and the difference between them is a cohort quietly dropped. The rule ordering in
+`runtime/scheduler.py` carries a comment about the time this went wrong and filed every
+history-less subject under the wrong reason - correct behaviour, lying explanation.
+
 ## What is in here
 
 ```
 runtime/          the part that does not care what business you are in
   store.py        three concurrency primitives, one SQL statement each
   approval.py     human approval as a registerable primitive, not an if-statement
+  scheduler.py    time as a trigger, and suppression that records why
   policy.py       bind a finding to a LINE of the prompt, not to a label a model typed
   review.py       cluster a week of corrections into at most a few proposed edits
   surface.py      chat as the entire UI: signing, the 3-second rule, card fallback
@@ -87,7 +148,7 @@ example/          an invented support inbox, to have something to be about
   prompts/        classify, generate, correct, propose-an-edit
   demo.py         the whole loop, offline
 
-tests/            63 tests, no framework, stdlib unittest
+tests/            77 tests, no framework, stdlib unittest
 ```
 
 ## The five decisions that matter
@@ -102,9 +163,7 @@ from a wording bug. Those get fixed in different places.
 **A prompt rule broken twice belongs in code.** The failure is the rule's *location*, not
 its wording. Rewording buys a lower failure rate; it never buys zero. So the boundary between
 prompt and code is not fixed at design time, **it moves** as failures accumulate, and that
-migration is normal operations rather than an admission of bad prompting. Four rules made
-that journey in production: typography normalisation, which experiment arm a subject is in,
-whether to reply at all, and the intent-to-route table.
+migration is normal operations rather than an admission of bad prompting.
 
 **Fail closed, everywhere it is cheap to.** An unconfigured signing secret refuses every
 request instead of accepting every request. An empty approver list authorises nobody. An
@@ -124,21 +183,34 @@ cohort over one denominator, how often a finding actually bound to a line of the
 (the difference between "fixed" and "believed fixed"), and, per applied edit, recurrence
 before versus after, normalised by volume.
 
+## The study that failed, and why it is here
+
+In September 2026 the obvious next move was to score each draft's readiness so the reviewer
+could read a verdict instead of a conversation, and eventually skip the easy cards entirely.
+
+It was tested properly: 1,225 real cards, thresholds and a decision rule fixed **in advance**,
+conversations cut at the moment each card was created so the answer could not leak, and two
+different judges - a general-purpose model and a purpose-built structured-decision model.
+
+**The best basket clearing 95% precision covered 2.5% of the queue**, against a 20% floor
+fixed beforehand. The feature was not built. Total cost of finding out: **$1.49 and one day.**
+
+The failure is more useful than a success would have been: the errors sit in drafts nobody
+wanted at all, and that decision depends on state outside the conversation, so no judge
+reading only the thread can reach it. [docs/measuring-a-judge.md](docs/measuring-a-judge.md)
+is the full write-up, including the numbers for both judges and the fairness caveats.
+
 ## What this does NOT do
 
 Honest limits, because they are the first questions a reviewer asks.
 
-- **It does not decide whether a reply is wanted at all.** In production, 18% of decided
-  cards were drafts nobody wanted, and that is the single largest source of wasted human
-  attention. The decision depends on state outside the conversation, so no judge reading
-  only the thread can reach it. [docs/measuring-a-judge.md](docs/measuring-a-judge.md) is
-  the study that establishes this, with numbers.
+- **It does not decide whether a reply is wanted at all.** 18% of decided cards were drafts
+  nobody wanted, and that remains the single largest source of wasted human attention.
 - **It has no cost instrumentation.** Tokens are counted nowhere.
-- **It is not a framework.** There is no plugin system and no configuration language. Fork
-  it, delete the example, write your own pipeline against `runtime/`.
-- **The confidence score routes nothing.** It is computed and displayed. On 1,295 real
-  cards, no intent-by-confidence cell with n >= 30 reached 95% clean approval, so it cannot
-  gate anything on its own.
+- **It is not a framework.** No plugin system, no configuration language. Fork it, delete the
+  example, write your own pipeline against `runtime/`.
+- **The confidence score routes nothing.** On 1,295 real cards, no intent-by-confidence cell
+  with n >= 30 reached 95% clean approval, so it cannot gate anything on its own.
 
 ## Further reading
 
@@ -146,8 +218,7 @@ Honest limits, because they are the first questions a reviewer asks.
   it is
 - [docs/review-loop.md](docs/review-loop.md) - the learning loop in detail, including two
   design mistakes and what they cost
-- [docs/measuring-a-judge.md](docs/measuring-a-judge.md) - a pre-registered study that tried
-  to automate the human gate away, and failed. The negative result is the point.
+- [docs/measuring-a-judge.md](docs/measuring-a-judge.md) - the pre-registered study above
 
 ## Licence
 

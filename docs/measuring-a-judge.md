@@ -30,9 +30,11 @@ after the fact always contains a point that looks like a result.
 
 ## Design
 
-**Population.** 1,225 real cards, every decided card in a 21-day window, after excluding
-follow-up and recovery engines and 70 cards whose conversation could not be faithfully
-reconstructed.
+**Population.** 1,225 real cards: every decided reply card created between 2026-09-01 and
+2026-09-22, after excluding the scheduled engines and 70 cards whose conversation could not
+be faithfully reconstructed. A 21-day window rather than the full history because the policy
+prompt changed during the period, and scoring older drafts against today's rules would be
+measuring the wrong thing.
 
 **Ground truth is what the human actually did**, which is a behavioural label, not a
 statement about factual safety:
