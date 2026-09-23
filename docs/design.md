@@ -53,8 +53,9 @@ gate is for, and what the Fix button turns into data.
 
 ```python
 ROUTES = {
-    "question":   ("answer_then_offer", 120),
-    "bug_report": ("acknowledge_and_escalate", 90),
+    "interested":    ("offer_next_step", 70),
+    "question_cost": ("answer_then_offer", 110),
+    "referral":      ("pick_up_the_referral", 60),
     ...
 }
 ```

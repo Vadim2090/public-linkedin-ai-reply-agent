@@ -109,10 +109,19 @@ def build_card(draft: dict, request_id: str, version: int = 1, allow_fix: bool =
     warn = "  :warning: LOW CONFIDENCE" if conf == "low" else ""
     header = f"*New draft* - *{draft.get('intent', '?')}*" + (f" ({conf})" if conf else "") + warn
 
+    route = draft.get("route")
+    arm = draft.get("arm")
+    warnings = draft.get("warnings") or []
     meta = "\n".join(filter(None, [
         f"*Subject:* {draft.get('subject_name') or draft.get('subject_id') or '(unknown)'}",
+        # Route and arm are decided in code, so showing them lets a reviewer separate a
+        # routing bug from a wording bug without opening anything.
+        (f"*Route:* {route}" + (f"   *Arm:* {arm}" if arm else "")) if route else "",
         f"*Flags on:* {', '.join(k for k, v in (draft.get('flags') or {}).items() if v) or 'none'}",
         f"*Why:* {draft.get('reasoning', '')}",
+        # Guardrails that did NOT hard-block ride onto the card rather than being dropped:
+        # the reviewer sees what the generator was unsure about.
+        (":warning: " + "; ".join(warnings)) if warnings else "",
     ]))
 
     blocks = [

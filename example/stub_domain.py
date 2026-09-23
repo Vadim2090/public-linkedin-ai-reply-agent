@@ -11,18 +11,29 @@ import json
 import re
 
 RULES = [
-    ("bug_report", r"\b(fail(s|ed|ing)?|error|crash|broken|not work|doesn'?t work|"
-                   r"nothing (happens|downloads)|502|500|timed? out)\b"),
-    ("billing",    r"\b(refund|charg(e|ed|es)|invoice|billing|payment|subscription|plan|price)\b"),
-    ("feature_request", r"\b(would be (great|nice)|feature request|could you add|wish (it|you)|"
-                        r"any plans to|roadmap)\b"),
-    ("complaint",  r"\b(unacceptable|disappointed|frustrat(ed|ing)|third time|still waiting|"
-                   r"terrible|awful)\b"),
-    ("acknowledgement", r"^\W*(thanks?|thank you|got it|ok(ay)?|perfect|great|cheers)\b[\s\S]{0,30}$"),
-    ("spam",       r"\b(crypto|seo services|guest post|backlink|investment opportunity)\b"),
-    ("question",   r"\?"),
+    ("out_of_office",   r"\b(out of (the )?office|annual leave|on holiday|away until|"
+                        r"auto(matic)?[- ]?reply)\b"),
+    ("referral",        r"\b(speak to|talk to|reach out to|you want|better person|"
+                        r"forward(ed|ing)? (this|you)|cc'?ing|introduce you)\b"),
+    ("hard_no",         r"\b(not interested|stop (contacting|messaging)|remove me|"
+                        r"unsubscribe|do not contact|no thanks?\b.*\bdon'?t)\b"),
+    ("already_using",   r"\b(already (use|using|have|work with)|we built|in[- ]house|"
+                        r"current (provider|vendor|supplier))\b"),
+    ("question_cost",   r"\b(how much|price|pricing|cost|budget|per seat|contract|"
+                        r"commercials?)\b"),
+    ("question_us",     r"\b(who are you|what is \w+\?|how did you (find|get)|why (me|us)|"
+                        r"where did you get)\b"),
+    ("not_now",         r"\b(next (quarter|year|month)|after (the )?(new year|summer)|"
+                        r"revisit|circle back|not right now|bad timing|q[1-4]\b)"),
+    ("not_relevant",    r"\b(not my (remit|area|department)|wrong person|i don'?t handle|"
+                        r"nothing to do with me)\b"),
+    ("acknowledgement", r"^\W*(thanks?|thank you|got it|ok(ay)?|perfect|great|cheers|"
+                        r"noted)\b[\s\S]{0,30}$"),
+    ("question_product", r"\b(how does it work|what does it do|tell me more|what exactly|"
+                         r"how would (it|that) work|integrat)\w*"),
+    ("interested",      r"\b(interested|sounds (good|interesting)|happy to|let'?s (talk|do|"
+                        r"chat)|send (it |me |them )?(over|through|across)|yes\b|keen)\b"),
 ]
-
 
 def handler(messages, json_mode):
     """Return a JSON answer for this domain, or None to let the generic stub answer."""
@@ -41,23 +52,30 @@ def handler(messages, json_mode):
     newest = _newest_inbound(user)
     low = newest.lower()
 
+    whole = user.lower()
     for intent, pattern in RULES:
         if re.search(pattern, low, re.I):
             return json.dumps({
                 "intent": intent,
-                "confidence": "high" if intent != "question" else "medium",
+                "confidence": "high" if intent != "question_product" else "medium",
                 "flags": {
-                    "angry": bool(re.search(r"\b(unacceptable|furious|terrible|awful)\b", low)),
-                    "asks_for_human": bool(re.search(r"\b(a human|real person|speak to someone)\b", low)),
-                    "mentions_refund": "refund" in low,
-                    "blocked_on_us": bool(re.search(r"\b(blocked|can'?t proceed|waiting on you)\b", low)),
-                    "already_answered": False,
+                    # Flags are read from the WHOLE thread, not the newest line: they decide
+                    # whether a reply may repeat something already sent.
+                    "offer_already_presented": bool(re.search(r"https?://", whole)),
+                    "booking_link_shared": "example.com/book" in whole,
+                    "closing_already_sent": bool(re.search(r"\bno (rush|pressure)\b", whole)),
+                    "asks_who_we_are": bool(re.search(r"\b(who are you|what is this)\b", low)),
+                    "explicit_ask": "?" in low,
+                    "names_a_colleague": intent == "referral",
+                    "wrong_person": intent == "not_relevant",
+                    "already_using_someone": intent == "already_using",
                 },
                 "reasoning": f"offline stub: matched the {intent} pattern in the newest "
                              f"inbound message. Not a model.",
             })
-    return json.dumps({"intent": "question", "confidence": "low", "flags": {},
-                       "reasoning": "offline stub: nothing matched, defaulting to question."})
+    return json.dumps({"intent": "question_product", "confidence": "low", "flags": {},
+                       "reasoning": "offline stub: nothing matched, defaulting to "
+                                    "question_product."})
 
 
 def _policy_lines(user):

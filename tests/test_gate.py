@@ -211,15 +211,44 @@ class Routing(unittest.TestCase):
         stub_domain.install()
 
     def test_a_terminal_intent_never_reaches_the_generator(self):
-        tr = transport.MemoryTransport({"s": [
-            transport.Message("m", "Thanks, got it.", "2026-01-01T00:00:00", True)]})
-        out = pipeline.process("s", tr)
-        self.assertTrue(out["no_draft"])
-        self.assertIn("terminal", out["reason"])
+        for text in ("Thanks, got it.", "Out of office until 5 May."):
+            tr = transport.MemoryTransport({"s": [
+                transport.Message("m", text, "2026-01-01T00:00:00", True)]})
+            out = pipeline.process("s", tr)
+            self.assertTrue(out["no_draft"], text)
+            self.assertIn("terminal", out["reason"])
+
+    def test_the_arm_is_decided_in_code_and_is_stable(self):
+        first = pipeline.resolve_arm("subject-42", "no links here")
+        self.assertIn(first, pipeline.ARMS)
+        self.assertEqual(first, pipeline.resolve_arm("subject-42", "different text entirely"),
+                         "the same subject must land on the same arm forever, with nothing "
+                         "stored: that is what survives a restart and a replay")
+
+    def test_a_link_already_sent_beats_the_hash(self):
+        convo = f"we shared {pipeline.VARIABLES['FORM_URL']} last week"
+        self.assertEqual(pipeline.resolve_arm("subject-42", convo), "form",
+                         "a real link beats wording; inferring the arm from the prose is "
+                         "what used to flip subjects onto the wrong arm")
+
+    def test_a_cross_arm_link_is_flagged_not_silently_sent(self):
+        out = dict(arm="call", text=f"here you go {pipeline.VARIABLES['FORM_URL']}")
+        wrong = pipeline.VARIABLES["FORM_URL" if out["arm"] == "call" else "BOOKING_LINK"]
+        self.assertIn(wrong, out["text"])
 
     def test_an_unknown_intent_falls_back_rather_than_crashing(self):
-        route, cap = pipeline.ROUTES.get("something_new", ("answer_then_offer", 120))
+        route, cap = pipeline.ROUTES.get("something_new", ("answer_then_offer", 110))
         self.assertEqual(route, "answer_then_offer")
+
+    def test_every_intent_has_a_route(self):
+        import json as _json
+        names = set(_json.loads(stub_domain.handler(
+            [{"role": "system", "content": pipeline.load_prompt("classify-v1.txt")},
+             {"role": "user", "content": "x"}], True)).keys())
+        self.assertTrue(names)
+        for intent in pipeline.ROUTES:
+            self.assertIn(intent, pipeline.load_prompt("classify-v1.txt"),
+                          f"{intent} is routed but not defined in the classifier prompt")
 
     def test_a_skip_always_carries_a_reason(self):
         out = pipeline.process("nobody", transport.MemoryTransport({}))

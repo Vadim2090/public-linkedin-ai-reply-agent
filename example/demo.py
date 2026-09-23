@@ -18,18 +18,24 @@ from runtime import approval, policy, review, store, surface
 from runtime.transport import Message, MemoryTransport
 from . import pipeline, stub_domain
 
+# Three inbound replies to a cold outreach message. Invented, but the SHAPES are the ones
+# that actually arrive: a question, a redirect to a colleague, and a closing courtesy.
 SEED = {
     "alex": [
-        Message("m1", "Hi, does the export include archived records or only active ones?",
+        Message("m0", "Hi Alex, we work with operations teams on manual reporting. Worth a "
+                      "short conversation?", "2026-03-01T08:00:00", inbound=False),
+        Message("m1", "Sounds interesting, how much does it cost?",
                 "2026-03-01T09:00:00", inbound=True),
     ],
     "sam": [
-        Message("m2", "The CSV export has been failing since yesterday. I click it and "
-                      "nothing downloads.", "2026-03-01T09:05:00", inbound=True),
+        Message("m2", "Hi Sam, quick note about reporting workload on your ops team.",
+                "2026-03-01T08:00:00", inbound=False),
+        Message("m3", "Not my remit I'm afraid, you want whoever runs ops reporting.",
+                "2026-03-01T09:05:00", inbound=True),
     ],
     "robin": [
-        Message("m3", "Here is the invoice you asked for.", "2026-03-01T08:00:00", inbound=False),
-        Message("m4", "Thanks, got it.", "2026-03-01T08:30:00", inbound=True),
+        Message("m4", "Here is the overview I mentioned.", "2026-03-01T08:00:00", inbound=False),
+        Message("m5", "Thanks, got it.", "2026-03-01T08:30:00", inbound=True),
     ],
 }
 
@@ -96,7 +102,7 @@ def main():
         print("  (sam produced no card, so there is nothing to fix)")
         return
     appr = store.get_approval(rid)
-    critique = "This promises a fix by Friday. We have not been told that."
+    critique = "It promises an outcome nobody gave us."
     result = pipeline.correct(appr["data"]["conversation"], appr["data"]["text"],
                              critique, policy_path.read_text(encoding="utf-8"))
     bound = policy.bind(result.get("violated"), result.get("policy_quote"), policy_path)
@@ -119,11 +125,11 @@ def main():
     print("  approved at v2 and sent.")
 
     print("\n### 4. A card nobody wants\n")
-    rid = store.save_approval({"text": "Thanks for confirming.", "intent": "acknowledgement"},
+    rid = store.save_approval({"text": "Glad that was useful.", "intent": "acknowledgement"},
                               kind="reply", subject_id="robin")
     store.set_status(rid, "declined", by="reviewer-1", expect_version=1)
     store.record_revision(rid, 1, kind="decline", subject_id="robin",
-                          reviewer_reason="They said thanks. No reply is needed.",
+                          reviewer_reason="They said thanks and nothing else. No reply is needed.",
                           reviewer_id="reviewer-1", violated=store.TAG_DECLINE_PLAIN)
     print("  declined with a required reason. This is an ENTRY GATE signal, not a wording")
     print("  one, so the weekly pass reports it separately and never proposes a prompt edit.")

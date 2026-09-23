@@ -1,7 +1,7 @@
 # public-linkedin-ai-reply-agent
 
-The public, domain-free extraction of a LinkedIn reply agent I have been building and
-operating since **June 2025**: an inbound message arrives, a model drafts a reply, a human
+The public extraction of a LinkedIn reply agent I have been building and operating since
+**June 2025**: someone replies to a cold outreach message, a model drafts an answer, a human
 approves it, and **the approval is kept as training data.**
 
 That third clause is the one most review workflows drop, and it is the reason this
@@ -38,8 +38,10 @@ files, because the git history keeps it.
 
 So this repository is a **fresh extraction, not a redaction.** The transport, the
 orchestration, the approval primitive, the concurrency guards, the scheduled engine and the
-learning loop are the same design. The domain is an invented support inbox, because the real
-one cannot ship.
+learning loop are the same design, and so is the example domain: inbound replies to cold
+outreach on a professional network. What is replaced is everything commercial - the company,
+the product, the copy, the figures, the links and the objection scripts are placeholders.
+Structure ports; content does not, and the content is the part that is not mine to publish.
 
 ## Operating numbers
 
@@ -143,12 +145,12 @@ runtime/          the part that does not care what business you are in
   llm.py          raw HTTP, and provider/model/mode treated as one decision
   transport.py    the two methods you implement to plug in your own channel
 
-example/          an invented support inbox, to have something to be about
-  pipeline.py     two passes, routing in code, one deterministic chokepoint
+example/          inbound replies to cold outreach, with every value a placeholder
+  pipeline.py     two passes, routing AND experiment arm in code, one chokepoint
   prompts/        classify, generate, correct, propose-an-edit
   demo.py         the whole loop, offline
 
-tests/            77 tests, no framework, stdlib unittest
+tests/            81 tests, no framework, stdlib unittest
 ```
 
 ## The five decisions that matter
@@ -176,6 +178,12 @@ silently bypass a safety flag that read `false`.
 rowcount check. Optimistic concurrency on approval is a conditional `UPDATE`. Each replaces
 infrastructure people normally reach for, and each is one statement because that is what
 makes it correct: the atomicity belongs to the database, not to us.
+
+**The experiment arm is resolved in code, before the generator is called.** A subject is
+locked to one of two next steps, and which one is decided by a rule you can unit test: a link
+already in the thread wins, otherwise a stable hash of the subject id. The generator used to
+infer it from the wording, and it drifted - a message that merely SOUNDED like one arm flipped
+a subject who had been sent the other. A real link beats prose, and reading it is three lines.
 
 **Measure the loop, or it dies.** A weekly ritual that asks for approvals without showing
 that last week's approvals changed anything is a meeting. The header reports acceptance as a
