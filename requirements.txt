@@ -1,0 +1,10 @@
+# The runtime and the offline demo need nothing beyond the standard library.
+#
+# For a real deployment you will want a web framework to receive the webhook and the
+# interactivity callback. Any of them work; the runtime has no opinion:
+#
+#   fastapi
+#   uvicorn[standard]
+#
+# Model calls go over urllib, so there is no provider SDK here on purpose. See
+# runtime/llm.py for why.
