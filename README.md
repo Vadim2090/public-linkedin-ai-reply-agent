@@ -143,6 +143,7 @@ runtime/          the part that does not care what business you are in
   review.py       cluster a week of corrections into at most a few proposed edits
   surface.py      chat as the entire UI: signing, the 3-second rule, card fallback
   llm.py          raw HTTP, and provider/model/mode treated as one decision
+  typesafe.py     optional second reader (TypeSafe Jev); off unless a key is set
   transport.py    the two methods you implement to plug in your own channel
 
 example/          inbound replies to cold outreach, with every value a placeholder
@@ -150,7 +151,7 @@ example/          inbound replies to cold outreach, with every value a placehold
   prompts/        classify, generate, correct, propose-an-edit
   demo.py         the whole loop, offline
 
-tests/            81 tests, no framework, stdlib unittest
+tests/            100 tests, no framework, stdlib unittest
 ```
 
 ## The five decisions that matter
@@ -227,6 +228,8 @@ Honest limits, because they are the first questions a reviewer asks.
 - [docs/review-loop.md](docs/review-loop.md) - the learning loop in detail, including two
   design mistakes and what they cost
 - [docs/measuring-a-judge.md](docs/measuring-a-judge.md) - the pre-registered study above
+- [docs/second-reader.md](docs/second-reader.md) - an optional, blind second classification
+  and its pre-registered synthetic evaluation. Enabling it sends message text to TypeSafe
 
 ## Licence
 

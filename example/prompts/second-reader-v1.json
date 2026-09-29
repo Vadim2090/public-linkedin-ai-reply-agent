@@ -1,0 +1,21 @@
+{
+  "type": "choice",
+  "instructions": {
+    "question": "Which single intent best describes `newest_inbound` in the context of `thread`?",
+    "focus": "Classify the newest inbound message. A specific question or explicit priority condition outranks general interest."
+  },
+  "criteria": {
+    "interested": {"means": "Accepts the offer or wants to hear more without asking a more specific question."},
+    "question_product": {"means": "Asks what the product does, how it works, or what the process is."},
+    "question_cost": {"means": "Asks about price, budget, contract length, or commercial terms.", "not_when": "Do not choose interested when any cost question is present."},
+    "question_us": {"means": "Asks who we are, how we found them, or why we contacted them."},
+    "not_now": {"means": "Interested in principle but names or implies a later time horizon.", "not_when": "A named later horizon remains not_now even when the wording is warm or accepts the offer."},
+    "not_relevant": {"means": "Says this is outside their role, company, or remit and gives no colleague to contact.", "not_when": "If a colleague or role to contact is provided, choose referral."},
+    "already_using": {"means": "Already uses a supplier, tool, internal process, or in-house solution.", "not_when": "Having an existing solution is already_using, not hard_no, unless they separately demand no further contact."},
+    "referral": {"means": "Points to a colleague, named role, or other contact who may be relevant.", "not_when": "A referral outranks the decline or wrong-person wording wrapped around it."},
+    "hard_no": {"means": "Explicitly refuses or asks not to be contacted again."},
+    "acknowledgement": {"means": "A pure closing courtesy with nothing to answer.", "not_when": "Any new question or request, including one introduced after thanks, is not an acknowledgement."},
+    "out_of_office": {"means": "An automatic absence or out-of-office response.", "not_when": "Choose out_of_office even if the automatic text also sounds interested or includes contact details."},
+    "unclear": {"means": "The message does not provide enough evidence to choose any other intent."}
+  }
+}
