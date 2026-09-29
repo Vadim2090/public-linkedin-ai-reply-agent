@@ -27,6 +27,10 @@ import time
 import urllib.error
 import urllib.request
 
+# Optional measurement hook installed by evaluation tooling. It receives the pass name and
+# provider usage object but cannot change the model response.
+USAGE_HANDLER = None
+
 # provider -> (default model, is_reasoning). The default model follows the provider so
 # that switching provider returns the whole triple, not just the URL.
 DEFAULTS = {
@@ -97,6 +101,8 @@ def chat(messages, *, prefix="LLM", json_mode=False, max_tokens=1000,
                 url, data=json.dumps(body).encode(), headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 payload = json.loads(r.read().decode())
+            if USAGE_HANDLER is not None:
+                USAGE_HANDLER(prefix, payload.get("usage", {}))
             return payload["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as e:
             last = e

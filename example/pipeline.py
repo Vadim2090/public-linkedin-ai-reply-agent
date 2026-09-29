@@ -22,10 +22,12 @@ will occasionally do neither well, and when it goes wrong there is nothing to un
 """
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
-from runtime import llm, transport
+from runtime import llm, transport, typesafe
+from . import second_reader
 
 PROMPTS = Path(__file__).resolve().parent / "prompts"
 
@@ -131,7 +133,8 @@ def classify(conversation_text):
     raw = llm.chat(
         [{"role": "system", "content": load_prompt("classify-v1.txt")},
          {"role": "user", "content": conversation_text}],
-        prefix="PASS1", json_mode=True, max_tokens=500, temperature=0.2)
+        prefix="PASS1", json_mode=True,
+        max_tokens=int(os.environ.get("PASS1_MAX_TOKENS", "500")), temperature=0.2)
     try:
         out = json.loads(raw)
     except json.JSONDecodeError:
@@ -225,10 +228,24 @@ def process(subject_id, tr: transport.Transport):
     intent = classifier.get("intent")
     route, cap = ROUTES.get(intent, ("answer_then_offer", 110))
     arm = resolve_arm(subject_id, conversation)
+    # Optional and advisory: a blind second classification that can only add a line to the
+    # card. It never changes the route, the arm or whether a card is posted. With no key the
+    # result carries no trace of it, so the offline path is byte-for-byte what it was.
+    extra = {}
+    if typesafe.enabled():
+        extra["second_reader"] = reader = second_reader.read(messages, intent)
 
     if route in TERMINAL:
-        return {"no_draft": True, "reason": f"terminal intent '{intent}'; no reply needed",
-                "intent": intent, "classifier": classifier}
+        reason = f"terminal intent '{intent}'; no reply needed"
+        # A terminal intent produces no card, so a disagreement is at least recorded here
+        # rather than dropped with the message.
+        if extra and reader["status"] == "unavailable":
+            reason += "; second reader unavailable"
+        elif extra and reader["flagged"]:
+            reason += (f"; second reader said '{reader['choice']}' "
+                       f"(confidence {reader['confidence']:.2f})")
+        return {"no_draft": True, "reason": reason, "intent": intent,
+                "classifier": classifier, **extra}
 
     text = normalise(generate(conversation, classifier, route, arm, cap))
 
@@ -257,4 +274,5 @@ def process(subject_id, tr: transport.Transport):
         "conversation": conversation,
         "text": text,
         "warnings": warnings,
+        **extra,
     }

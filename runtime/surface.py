@@ -112,6 +112,15 @@ def build_card(draft: dict, request_id: str, version: int = 1, allow_fix: bool =
     route = draft.get("route")
     arm = draft.get("arm")
     warnings = draft.get("warnings") or []
+    reader = draft.get("second_reader")
+    reader_line = ""
+    if reader and reader.get("status") == "unavailable":
+        reader_line = ":eyes: Second reader unavailable"
+    elif reader and reader.get("flagged"):
+        choice = reader.get("choice") or "unclear"
+        probability = (reader.get("probabilities") or {}).get(choice, 0.0)
+        reader_line = (f":eyes: Second reader: {choice} (p={probability:.2f}); "
+                       f"pipeline said {draft.get('intent', '?')}")
     meta = "\n".join(filter(None, [
         f"*Subject:* {draft.get('subject_name') or draft.get('subject_id') or '(unknown)'}",
         # Route and arm are decided in code, so showing them lets a reviewer separate a
@@ -122,6 +131,7 @@ def build_card(draft: dict, request_id: str, version: int = 1, allow_fix: bool =
         # Guardrails that did NOT hard-block ride onto the card rather than being dropped:
         # the reviewer sees what the generator was unsure about.
         (":warning: " + "; ".join(warnings)) if warnings else "",
+        reader_line,
     ]))
 
     blocks = [
