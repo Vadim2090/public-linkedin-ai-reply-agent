@@ -2,7 +2,7 @@
 
 [![test](https://github.com/Vadim2090/public-linkedin-ai-reply-agent/actions/workflows/test.yml/badge.svg)](https://github.com/Vadim2090/public-linkedin-ai-reply-agent/actions/workflows/test.yml)
 
-CI runs the tests on 6 Python versions (3.9 to 3.14) and a gitleaks secret scan of the full
+CI runs the tests on 5 Python versions (3.10 to 3.14) and a gitleaks secret scan of the full
 git history on every push and pull request. The suite is fully offline: no network, no API
 keys, no LLM calls.
 
