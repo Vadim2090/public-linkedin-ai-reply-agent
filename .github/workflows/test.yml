@@ -1,0 +1,43 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the floor the code actually runs on (typing.Optional/List, no match or X | Y).
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run tests (standard library only, offline)
+        run: python -m unittest discover -s tests -v
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan full git history with gitleaks
+        # Official Docker image; exits non-zero when it finds a secret.
+        run: >
+          docker run --rm -v "${{ github.workspace }}:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.24.0
+          git /repo --redact --verbose

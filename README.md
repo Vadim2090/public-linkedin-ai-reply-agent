@@ -1,5 +1,11 @@
 # public-linkedin-ai-reply-agent
 
+[![test](https://github.com/Vadim2090/public-linkedin-ai-reply-agent/actions/workflows/test.yml/badge.svg)](https://github.com/Vadim2090/public-linkedin-ai-reply-agent/actions/workflows/test.yml)
+
+CI runs the tests on 6 Python versions (3.9 to 3.14) and a gitleaks secret scan of the full
+git history on every push and pull request. The suite is fully offline: no network, no API
+keys, no LLM calls.
+
 The public extraction of a LinkedIn reply agent I have been building and operating since
 **June 2025**: someone replies to a cold outreach message, a model drafts an answer, a human
 approves it, and **the approval is kept as training data.**
